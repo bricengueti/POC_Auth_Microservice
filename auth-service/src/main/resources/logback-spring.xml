@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss} %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE_JSON" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/auth-service.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/auth-service.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"service":"auth-service","env":"${spring.profiles.active}"}</customFields>
+        </encoder>
+    </appender>
+
+    <!-- Silence les librairies tierces -->
+    <logger name="org.hibernate" level="WARN"/>
+    <logger name="org.apache.catalina" level="WARN"/>
+    <logger name="org.apache.coyote" level="WARN"/>
+    <logger name="org.springframework.boot.devtools" level="WARN"/>
+    <logger name="org.springframework.orm" level="WARN"/>
+    <logger name="org.springframework.boot.autoconfigure" level="WARN"/>
+    <logger name="com.zaxxer.hikari" level="WARN"/>
+    <logger name="org.springdoc" level="WARN"/>
+    <logger name="org.springframework.data.repository" level="WARN"/>
+    <logger name="org.springframework.web.servlet.DispatcherServlet" level="WARN"/>
+
+    <!-- Ton code → tout logger -->
+    <logger name="cm.tchongoue" level="DEBUG"/>
+
+    <!-- Spring web → erreurs uniquement -->
+    <logger name="org.springframework.web" level="WARN"/>
+    <logger name="org.springframework.data.redis" level="WARN"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE_JSON"/>
+    </root>
+
+</configuration>

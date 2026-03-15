@@ -1,0 +1,12 @@
+package cm.tchongoue.auth_service.DTO.requestDTO;
+
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+
+public record RegisterProfileRequest(
+        @NotBlank String userId,
+        @NotBlank String firstName,
+        @NotBlank String lastName,
+        @Email @NotBlank String email
+) {}

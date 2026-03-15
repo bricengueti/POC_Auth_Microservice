@@ -1,0 +1,133 @@
+services:
+
+  # =========================
+  # Keycloak
+  # =========================
+  keycloak:
+    image: quay.io/keycloak/keycloak:22.0.1
+    container_name: keycloak
+    command: start-dev --health-enabled=true
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN_USERNAME}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+    ports:
+      - "8080:8080"
+    networks:
+      - poc-net
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo -e 'GET /health/ready HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && timeout 2 cat <&3 | grep -q 'UP'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  # =========================
+  # Keycloak Init
+  # =========================
+  keycloak-init:
+    image: curlimages/curl:latest
+    container_name: keycloak-init
+    volumes:
+      - ./auth-service/init-keycloak.sh:/init-keycloak.sh
+    entrypoint: ["/bin/sh", "/init-keycloak.sh"]
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - poc-net
+
+  # =========================
+  # Redis
+  # =========================
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - poc-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # =========================
+  # Discovery Service (Eureka)
+  # =========================
+  discovery-service:
+    build: ./discovery-service
+    image: discovery-service:latest
+    container_name: discovery-service
+    ports:
+      - "8761:8761"
+    environment:
+      - JAVA_OPTS=-Xmx64m -Xms32m
+    networks:
+      - poc-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8761/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  # =========================
+  # Auth Service
+  # =========================
+  auth-service:
+    build: ./auth-service
+    image: auth-service:latest
+    container_name: auth-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - KEYCLOAK_URL=${KEYCLOAK_URL}
+      - KEYCLOAK_ADMIN_USERNAME=${KEYCLOAK_ADMIN_USERNAME}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
+      - EUREKA_URL=${EUREKA_URL}
+    ports:
+      - "8081:8081"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+    networks:
+      - poc-net
+
+  # =========================
+  # Gateway Service
+  # =========================
+  gateway-service:
+    build: ./gatwayService
+    image: gateway-service:latest
+    container_name: gateway-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}
+      - SERVER_PORT=${SERVER_PORT}
+      - EUREKA_URL=${EUREKA_URL}
+      - KEYCLOAK_ISSUER_URI=${KEYCLOAK_ISSUER_URI}
+    ports:
+      - "8888:8888"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    networks:
+      - poc-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8888/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+networks:
+  poc-net:
+    driver: bridge
+    name: poc-net
